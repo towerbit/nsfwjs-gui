@@ -1,0 +1,24 @@
+﻿<?xml version='1.0' encoding='utf-8'?>
+<SettingsFile xmlns="http://schemas.microsoft.com/VisualStudio/2004/01/settings" CurrentProfile="(Default)" GeneratedClassNamespace="nsfwjs_gui.Properties" GeneratedClassName="Settings">
+  <Profiles />
+  <Settings>
+    <Setting Name="LocalUrl" Type="System.String" Scope="Application">
+      <Value Profile="(Default)">http://localhost:23877/nsfw</Value>
+    </Setting>
+    <Setting Name="RemoteUrl" Type="System.String" Scope="Application">
+      <Value Profile="(Default)">http://frp.evenstandard.top:23333/single/multipart-form</Value>
+    </Setting>
+    <Setting Name="LocalArguments" Type="System.String" Scope="Application">
+      <Value Profile="(Default)">nsfwjs-rest-server.js</Value>
+    </Setting>
+    <Setting Name="LocalWorkingDirectory" Type="System.String" Scope="Application">
+      <Value Profile="(Default)">nsfwjs-rest</Value>
+    </Setting>
+    <Setting Name="OutputDirectory" Type="System.String" Scope="User">
+      <Value Profile="(Default)">d:\temp\nsfwjs-gui\</Value>
+    </Setting>
+    <Setting Name="OutputLimit" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">32</Value>
+    </Setting>
+  </Settings>
+</SettingsFile>
