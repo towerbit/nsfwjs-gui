@@ -9,17 +9,44 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.IO;
 
 namespace nsfwjs_gui
 {
     public partial class frmMain : Form
     {
-        private ContextMenuStrip _cms;
         public frmMain()
         {
             InitializeComponent();
-            nudOutputLimit.Enabled = false;
+            
+            gbxSettings.Enabled = true;
+            btnStart.Enabled = true;
+            btnAdd.Enabled = true;
+            btnRemove.Enabled = true;
+            btnStop.Enabled = false;
 
+            cboHost.Text = Properties.Settings.Default.Host;
+            txtOutputDirectory.Text = Properties.Settings.Default.OutputDirectory;
+            nudSkipLimit.Value = Properties.Settings.Default.SkipLimit;
+            nudProbability.Value = Properties.Settings.Default.MinProbability;
+
+            initLvwSource();
+            initCmsAdd();
+        }
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            base.OnFormClosing(e);
+
+            Properties.Settings.Default.Host = cboHost.Text;
+            Properties.Settings.Default.OutputDirectory = txtOutputDirectory.Text;
+            Properties.Settings.Default.SkipLimit= (int)nudSkipLimit.Value;
+            Properties.Settings.Default.MinProbability= (int)nudProbability.Value;
+            Properties.Settings.Default.Save(); 
+        }
+        private ContextMenuStrip _cmsSource;
+        private void initLvwSource()
+        {
             lvwSource.SmallImageList = new ImageList();
             lvwSource.SmallImageList.ImageSize = new Size(16, 16);
             lvwSource.SmallImageList.Images.Add("unknown", Properties.Resources.unknown);
@@ -30,6 +57,34 @@ namespace nsfwjs_gui
             lvwSource.Columns.Add("Source");
             lvwSource.Columns[0].Width = lvwSource.Width;
 
+            var mnuSource = new ToolStripMenuItem("Source");
+            mnuSource.Click += (s, e) =>
+            {
+                if (lvwSource.SelectedItems.Count > 0 && !lvwSource.SelectedItems[0].Text.Contains("://"))
+                {
+                    //定位到源文件
+                    explorerOpen(lvwSource.SelectedItems[0].Text, true);
+                }
+            };
+
+            var mnuOutput = new ToolStripMenuItem("Output");
+            mnuOutput.Click += (s, e) =>
+            {
+                if (lvwSource.SelectedItems.Count > 0)
+                {
+                    //定位到输出目录
+                    var outputFolder = Path.Combine(txtOutputDirectory.Text,
+                                                    validFilename(lvwSource.SelectedItems[0].Text));
+                    explorerOpen(outputFolder);
+                }
+            };
+            _cmsSource = new ContextMenuStrip();
+            _cmsSource.Items.AddRange(new[] { mnuSource, mnuOutput });
+        }
+
+        private ContextMenuStrip _cmsAdd;
+        private void initCmsAdd()
+        {
             var mnuFile = new ToolStripMenuItem("File");
             mnuFile.Click += (s, e) =>
             {
@@ -60,89 +115,109 @@ namespace nsfwjs_gui
                 }
             };
 
-            _cms = new ContextMenuStrip();
-            _cms.Items.AddRange(new[]{ mnuFile, mnuUrl});
+            _cmsAdd = new ContextMenuStrip();
+            _cmsAdd.Items.AddRange(new[] { mnuFile, mnuUrl });
         }
 
         private CancellationTokenSource _cts;
 
         private void btnStart_Click(object sender, EventArgs e)
         {
+            lstLog.Items.Clear();
+            foreach (ListViewItem item in lvwSource.Items)
+                item.ForeColor = Color.Black;
+               
             string args = "";
-            if (rbtLocal.Checked)
-            {
-                startLocalRestServer();
-                args += $"--webapi={Properties.Settings.Default.LocalUrl}";
-            }
+            if (cboHost.Text=="127.0.0.1" || cboHost.Text.Equals("localhost", StringComparison.OrdinalIgnoreCase))
+                args += $" --host=localhost";
             else
-                args += $"--webapi={Properties.Settings.Default.RemoteUrl}";
+                args += $" --host={cboHost.Text}";
 
-            if (chkOutputLimit.Checked && nudOutputLimit.Value > 0)
-                args += $"--limit={nudOutputLimit.Value} ";
+            if (nudSkipLimit.Value > 0)
+                args += $" --skip={nudSkipLimit.Value} ";
 
-            if (txtOutputDirectory.TextLength > 0 && System.IO.Directory.Exists(txtOutputDirectory.Text))
-                args += $"--output={txtOutputDirectory.Text}";
+            if (txtOutputDirectory.TextLength > 0 && Directory.Exists(txtOutputDirectory.Text))
+                args += $" --output={txtOutputDirectory.Text}";
 
+            args += $" --prob={nudProbability.Value / 100}";
+
+            if (txtOutputDirectory.TextLength > 0 && !Directory.Exists(txtOutputDirectory.Text))
+                try
+                {
+                    Directory.CreateDirectory(txtOutputDirectory.Text);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(ex.Message, this.Text,
+                        MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+                    return;
+                }
+
+            btnStart.Enabled = false;
+            gbxSettings.Enabled = false;
+            btnAdd.Enabled = false;
+            btnRemove.Enabled = false;
+
+            btnStop.Enabled = true;
+
+            _cts = new CancellationTokenSource();
             foreach (ListViewItem item in lvwSource.Items)
             {
+                item.ForeColor = Color.Red;
+
                 var p = new Process();
-                p.StartInfo.FileName = "nsfwjs-ffmpeg";
-                p.StartInfo.Arguments = $"--src={item.Text} {args}";
+#if DEBUG
+                p.StartInfo.FileName = @"../net5.0/nsfwjs-ffmpeg.exe";
+                p.StartInfo.WorkingDirectory = @"../net5.0/";
+#else
+                p.StartInfo.FileName = "nsfwjs-ffmpeg.exe";
+                p.StartInfo.WorkingDirectory = Application.StartupPath;
+#endif
+                p.StartInfo.Arguments = $"--src=\"{item.Text}\" {args}";
                 p.StartInfo.UseShellExecute = false;
                 p.StartInfo.RedirectStandardOutput = true;
+                p.StartInfo.CreateNoWindow = true;
                 p.Start();
 
                 Task t = new(() =>
                 {
                     while (!p.StandardOutput.EndOfStream && !_cts.IsCancellationRequested)
                     {
-                        Console.WriteLine(p.StandardOutput.ReadLine());
+                        this.Invoke(new Action(() =>
+                        {
+                            var idx=lstLog.Items.Add(p.StandardOutput.ReadLine());
+                            lstLog.TopIndex++; 
+                        }));
                     }
-                }, _cts.Token);
-                t.Start();
-                p.WaitForExit();
-                item.ImageKey = p.ExitCode > 0 ? "good" : "bad";
-            }
-        }
-
-        private void startLocalRestServer()
-        {
-            Process p = null;
-
-            //test if nsfwjs-rest already run 
-            _cts = new CancellationTokenSource();
-            var client = new RestSharp.RestClient();
-            var test = new RestSharp.RestRequest(RestSharp.Method.GET);
-            System.Net.HttpStatusCode statusCode = client.Execute(test).StatusCode;
-            if (statusCode != System.Net.HttpStatusCode.NotFound)
-            {
-                lstLog.Items.Add("start nsfwjs rest server...");
-                p = new Process();
-                p.StartInfo.FileName = "node";
-                p.StartInfo.Arguments = Properties.Settings.Default.LocalArguments;
-                p.StartInfo.WorkingDirectory = Properties.Settings.Default.LocalWorkingDirectory;
-                //p.StartInfo.WindowStyle = ProcessWindowStyle.Hidden;
-                p.StartInfo.UseShellExecute = false;
-                //p.StartInfo.CreateNoWindow = true;
-                p.StartInfo.RedirectStandardOutput = true;
-                p.Start();
-
-                Task t = new(() =>
-                {
-                    while (!p.StandardOutput.EndOfStream && !_cts.IsCancellationRequested)
-                        lstLog.Items.Add(p.StandardOutput.ReadLine());
-                    p.Kill();
+                    p.Kill(); //user canceled
+                    p.Dispose();
+                    p = null;
                 }, _cts.Token);
                 t.Start();
 
-                //waiting for nsfwjs rest server
-                test = new RestSharp.RestRequest(RestSharp.Method.GET);
-                while (client.Execute(test).StatusCode != System.Net.HttpStatusCode.NotFound)
-                {
-                    Console.WriteLine("Waiting for nsfwjs server starting...");
-                    Thread.Sleep(1000);
+                while (null!=p && !p.HasExited)
+                { 
+                    Application.DoEvents();
+                    if (_cts.IsCancellationRequested)
+                        break;
                 }
+
+                if (_cts.IsCancellationRequested)
+                    break;
+
+                var exitCode = null!=p? p.ExitCode:0;
+                lstLog.Items.Add($"nsfwjs-ffmpeg exit with {exitCode}");
+                if(exitCode >= 0)
+                    item.ImageKey = exitCode > nudSkipLimit.Value ? "bad": "good";
+                item.ForeColor = Color.Black;
             }
+
+            btnStart.Enabled = true;
+            gbxSettings.Enabled = true;
+            btnAdd.Enabled = true;
+            btnRemove.Enabled = true;
+
+            btnStop.Enabled = false;
         }
 
         private void btnStop_Click(object sender, EventArgs e)
@@ -153,7 +228,7 @@ namespace nsfwjs_gui
         private void btnAdd_Click(object sender, EventArgs e)
         {
             var p = this.PointToScreen(btnAdd.Location);
-            _cms.Show(new Point(p.X, 
+            _cmsAdd.Show(new Point(p.X,
                                 p.Y + btnAdd.Height));
         }
 
@@ -174,19 +249,64 @@ namespace nsfwjs_gui
         {
             using (var fbd = new FolderBrowserDialog())
             {
-                if (System.IO.Directory.Exists(txtOutputDirectory.Text))
+                if (Directory.Exists(txtOutputDirectory.Text))
                     fbd.SelectedPath = txtOutputDirectory.Text;
                 fbd.ShowNewFolderButton = true;
                 if (fbd.ShowDialog() == DialogResult.OK)
                 {
-                    txtOutputDirectory.Text = fbd.SelectedPath; 
-                }    
+                    txtOutputDirectory.Text = fbd.SelectedPath;
+                }
             }
         }
 
-        private void chkOutputLimit_CheckedChanged(object sender, EventArgs e)
+        private void lvwSource_MouseDoubleClick(object sender, MouseEventArgs e)
         {
-            nudOutputLimit.Enabled = chkOutputLimit.Checked; 
+            if (e.Button == MouseButtons.Left)
+            {
+                var currSelected = lvwSource.HitTest(e.Location);
+                if (currSelected.Item != null)
+                {
+                    lvwSource.SelectedItems.Clear();
+                    currSelected.Item.Selected = true;
+                    //打开选中项对应的输出目录
+                    var outputFolder = Path.Combine(txtOutputDirectory.Text, validFilename(currSelected.Item.Text));
+                    Debug.Print($"CurrSelected outputFolder:{outputFolder}");
+                    explorerOpen(outputFolder);
+                }
+            }
+        }
+
+        private static void explorerOpen(string fileOrDir, bool selected = false)
+        {
+            var p = new Process();
+            p.StartInfo.FileName = "explorer";
+            p.StartInfo.Arguments = $"{(selected?"/select,":"")}{fileOrDir}";
+            p.Start();
+        }
+
+        private static string validFilename(string src)
+        {
+            foreach (char c in Path.GetInvalidFileNameChars())
+                src = src.Replace(c, '_');
+            //foreach (char c in Path.GetInvalidPathChars())
+            //    src=src.Replace(c, '_');
+            return src;
+        }
+
+        private void lvwSource_MouseUp(object sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Right)
+            {
+                var currSelected = lvwSource.HitTest(e.Location);
+                if (currSelected.Item != null)
+                {
+                    lvwSource.SelectedItems.Clear();
+                    currSelected.Item.Selected = true;
+                    lvwSource.ContextMenuStrip = _cmsSource;
+                }
+                else
+                    lvwSource.ContextMenuStrip = null; //仅选中项目才显示右键菜单
+            }
         }
     }
 }

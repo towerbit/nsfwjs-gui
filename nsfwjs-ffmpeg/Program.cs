@@ -26,73 +26,79 @@ namespace nsfwjs_ffmpeg
             SetupLogging();
             ConfigureHWDecoder(out var deviceType);
 
-            var url = "http://frp.evenstandard.top:23333/single/multipart-form";
-            var src = "rtsp://admin:pass@19.0.1.117/H264?ch=1&subtype=0";
+            var url = "http://frp.evenstandard.top:23877/nsfw";
+            var src = ""; // "rtsp://admin:pass@19.0.1.117/H264?ch=1&subtype=0";
             var output = "d:\\temp\\nsfwjs_output";
+            var iSkip = 10000;
+            var fProb = 0.9F;
 
             foreach (string arg in args)
             {
                 if (arg.StartsWith("--src=", StringComparison.OrdinalIgnoreCase))
                     src = arg.Substring("--src=".Length);
-                if (arg.StartsWith("--local", StringComparison.OrdinalIgnoreCase))
-                    url = "http://localhost:23877/nsfw";
+                if (arg.StartsWith("--host=", StringComparison.OrdinalIgnoreCase))
+                    url = $"http://{arg.Substring("--host=".Length)}:23877/nsfw";
                 if (arg.StartsWith("--output=", StringComparison.OrdinalIgnoreCase))
                     output = arg.Substring("--output=".Length);
+                if (arg.StartsWith("--skip=", StringComparison.OrdinalIgnoreCase))
+                    iSkip = int.Parse(arg.Substring("--skip=".Length));
+                if (arg.StartsWith("--prob=", StringComparison.OrdinalIgnoreCase))
+                    fProb = float.Parse(arg.Substring("--prob=".Length));
             }
+
+            if (string.IsNullOrEmpty(src))
+            {
+                Console.WriteLine($"Failed for --src is empty");
+                Environment.Exit(-10000);
+            }
+            
             output = Path.Combine(output, validFilename(src));
+            if(!Directory.Exists(output))
+                try
+                {
+                    Directory.CreateDirectory(output);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Failed to create output folder {output}, err: {ex.Message}");
+                    Environment.Exit(-10001); 
+                }
+            
+            Console.WriteLine($"====\r\nsrc:\t{src}\r\nurl:\t{url}\r\nout:\t{output}\r\nskip:\t{iSkip}\r\nprob:\t{fProb}\r\n===="); 
 
             var client = new RestSharp.RestClient(url);
             var cts = new CancellationTokenSource();
+            var iCount = 0;
 
-
-            if (!string.IsNullOrEmpty(src) && (File.Exists(src) || src.StartsWith("http://") || src.StartsWith("rtsp://")))
+            if (File.Exists(src) || 
+                src.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || 
+                src.StartsWith("rtsp://", StringComparison.OrdinalIgnoreCase))
             {
                 Console.WriteLine($"Decoding {src}...");
-                var iCount = 0;
-                if (url.Equals("http://localhost:23877/nsfw"))
+                DecodeAllFramesToImages(deviceType, src, cts.Token, (bmp, num) =>
                 {
-                    DecodeAllFramesToImages(deviceType, src, cts.Token, (bmp, num) =>
-                    {
-                        if (!postBitmapLocal(bmp, num, client, output, ref iCount))
+                    if (postBitmap(bmp, num, client, output, fProb, ref iCount))
+                    { 
+                        if (iCount >= iSkip)
                         {
                             cts?.Cancel();
-                            Console.WriteLine("postBitmapLocal return false");
                         }
-                        else
-                            Console.WriteLine($"postBitmapLocal matched {iCount} times.");
-                    });
-                }
-                else
-                {
-                    DecodeAllFramesToImages(deviceType, src, cts.Token, (bmp, num) =>
-                    {
-                        if (!postBitmapRemote(bmp, num, client, output, ref iCount))
-                        {
-                            cts?.Cancel();
-                            Console.WriteLine("postBitmapRemote return false");
-                        }
-                        else
-                            Console.WriteLine($"postBitmapRemote matched {iCount} times.");
-                    });
-                }
-
+                    }
+                });
             }
             else
-                Console.WriteLine($"{src} File not found");
+            {
+                Console.WriteLine($"{src} not found or supported");
+                iCount = -10002;
+            }
 
-#if START_NSFWJS
-            cts?.Cancel();
-            p?.Kill();
-#endif
-            //Console.WriteLine("Encoding...");
-            //EncodeImagesToH264();
+            Environment.Exit(iCount);
         }
 
         delegate void dGotBitmap(Bitmap bmp, int frameNum);
-        //unsafe delegate void dGotYuvData(int width, int height, IntPtr out_buffer_video, int out_buffer_video_size, int pitch);
         unsafe delegate void dGotYuvData(AVCodecContext pCodexCtx, AVFrame pFrame);
 
-        private static bool postBitmapLocal(Bitmap bmp, int num, RestSharp.IRestClient client, string output, ref int iCount)
+        private static bool postBitmap(Bitmap bmp, int num, RestSharp.IRestClient client, string output, float fProb, ref int iCount)
         {
             using (var ms = new MemoryStream())
             {
@@ -101,7 +107,7 @@ namespace nsfwjs_ffmpeg
                 //或者生成JPEG缩略图, 减小文件尺寸和大小
 
                 var buff = ms.ToArray();
-                var filename = $"frame{num:D8}.jpg";
+                var filename = $"{num:D8}.jpg";
                 var request = new RestSharp.RestRequest(RestSharp.Method.POST);
                 request.AddFileBytes("image", buff, filename, "multipart/form-data");
 
@@ -111,72 +117,27 @@ namespace nsfwjs_ffmpeg
                     var result = JsonSerializer.Deserialize<List<dto_nsfwjs_result>>(response.Content);
                     dto_nsfwjs_result max = new dto_nsfwjs_result("Nothing", 0);
                     foreach (dto_nsfwjs_result item in result)
-                        if (item.probability > max.probability)
+                        if (item.probability >= max.probability)
                             max = item;
-                    Console.WriteLine($"{max}");
 
-                    if (max.probability > 0.9 && (max.className == "Porn" || max.className == "Hentai"))
+                    if (max.probability > fProb && (max.className == "Porn" || max.className == "Hentai"))
                     {
                         //save matched frame
                         filename = Path.Combine(output, filename);
                         File.WriteAllBytes(filename, buff);
                         iCount++;
-                        Console.WriteLine($"===== WARN ===== A {max.className} snapshot saved to {filename}");
+                        Console.WriteLine($"= WARN = Matched {iCount} for {max.className}, saved to {filename}");
                     }
+                    Console.WriteLine($"frameId:{num}, {max}");
 
                     return true;
                 }
+                else
+                    Console.WriteLine($"!!! RestSharp.Client response.StatusCode = {response.StatusCode}");
             }
             return false;
         }
         private record dto_nsfwjs_result(string className, double probability);
-
-        /// <summary>
-        /// post to "http://frp.evenstandard.top:23333/single/multipart-form"
-        /// </summary>
-        /// <param name="bmp"></param>
-        /// <param name="num"></param>
-        /// <param name="client"></param>
-        /// <param name="output"></param>
-        /// <param name="iCount"></param>
-        /// <returns></returns>
-        private static bool postBitmapRemote(Bitmap bmp, int num, RestSharp.IRestClient client, string output, ref int iCount)
-        {
-            using (var ms = new MemoryStream())
-            {
-                //convert to jpeg stream
-                bmp.Save(ms, ImageFormat.Jpeg);
-                //or create thumbnail for less size
-                //...
-
-                var buff = ms.ToArray();
-                var filename = $"frame{num:D8}.jpg";
-                var request = new RestSharp.RestRequest(RestSharp.Method.POST);
-                request.AddFileBytes("content", buff, filename, "multipart/form-data");
-
-                var response = client.Execute(request);
-                if (response.StatusCode == System.Net.HttpStatusCode.OK)
-                {
-                    var result = JsonSerializer.Deserialize<dto_prediction>(response.Content);
-                    dto_nsfwjs_result max = new dto_nsfwjs_result("Nothing", 0);
-                    foreach (dto_nsfwjs_result item in result.prediction)
-                        if (item.probability > max.probability)
-                            max = item;
-                    Console.WriteLine($"{max}");
-
-                    if (max.probability > 0.9 && (max.className == "Porn" || max.className == "Hentai"))
-                    {
-                        filename = Path.Combine(output, filename);
-                        File.WriteAllBytes(filename, buff); ;
-                        iCount++;
-                        Console.WriteLine($"===== WARN ===== A {max.className} snapshot saved to {filename}");
-                    }
-                    return true;
-                }
-            }
-            return false;
-        }
-        private record dto_prediction(dto_nsfwjs_result[] prediction);
 
         private static string validFilename(string src)
         {
@@ -186,36 +147,37 @@ namespace nsfwjs_ffmpeg
             //    src=src.Replace(c, '_');
             return src;
         }
+
         private static void ConfigureHWDecoder(out AVHWDeviceType HWtype)
         {
             HWtype = AVHWDeviceType.AV_HWDEVICE_TYPE_NONE;
-            return;
-            Console.WriteLine("Use hardware acceleration for decoding?[n]");
-            var key = Console.ReadLine();
-            var availableHWDecoders = new Dictionary<int, AVHWDeviceType>();
-            if (key == "y")
-            {
-                Console.WriteLine("Select hardware decoder:");
-                var type = AVHWDeviceType.AV_HWDEVICE_TYPE_NONE;
-                var number = 0;
-                while ((type = ffmpeg.av_hwdevice_iterate_types(type)) != AVHWDeviceType.AV_HWDEVICE_TYPE_NONE)
-                {
-                    Console.WriteLine($"{++number}. {type}");
-                    availableHWDecoders.Add(number, type);
-                }
-                if (availableHWDecoders.Count == 0)
-                {
-                    Console.WriteLine("Your system have no hardware decoders.");
-                    HWtype = AVHWDeviceType.AV_HWDEVICE_TYPE_NONE;
-                    return;
-                }
-                int decoderNumber = availableHWDecoders.SingleOrDefault(t => t.Value == AVHWDeviceType.AV_HWDEVICE_TYPE_DXVA2).Key;
-                if (decoderNumber == 0)
-                    decoderNumber = availableHWDecoders.First().Key;
-                Console.WriteLine($"Selected [{decoderNumber}]");
-                int.TryParse(Console.ReadLine(), out var inputDecoderNumber);
-                availableHWDecoders.TryGetValue(inputDecoderNumber == 0 ? decoderNumber : inputDecoderNumber, out HWtype);
-            }
+            //return;
+            //Console.WriteLine("Use hardware acceleration for decoding?[n]");
+            //var key = Console.ReadLine();
+            //var availableHWDecoders = new Dictionary<int, AVHWDeviceType>();
+            //if (key == "y")
+            //{
+            //    Console.WriteLine("Select hardware decoder:");
+            //    var type = AVHWDeviceType.AV_HWDEVICE_TYPE_NONE;
+            //    var number = 0;
+            //    while ((type = ffmpeg.av_hwdevice_iterate_types(type)) != AVHWDeviceType.AV_HWDEVICE_TYPE_NONE)
+            //    {
+            //        Console.WriteLine($"{++number}. {type}");
+            //        availableHWDecoders.Add(number, type);
+            //    }
+            //    if (availableHWDecoders.Count == 0)
+            //    {
+            //        Console.WriteLine("Your system have no hardware decoders.");
+            //        HWtype = AVHWDeviceType.AV_HWDEVICE_TYPE_NONE;
+            //        return;
+            //    }
+            //    int decoderNumber = availableHWDecoders.SingleOrDefault(t => t.Value == AVHWDeviceType.AV_HWDEVICE_TYPE_DXVA2).Key;
+            //    if (decoderNumber == 0)
+            //        decoderNumber = availableHWDecoders.First().Key;
+            //    Console.WriteLine($"Selected [{decoderNumber}]");
+            //    int.TryParse(Console.ReadLine(), out var inputDecoderNumber);
+            //    availableHWDecoders.TryGetValue(inputDecoderNumber == 0 ? decoderNumber : inputDecoderNumber, out HWtype);
+            //}
         }
 
         private static unsafe void SetupLogging()

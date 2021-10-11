@@ -9,6 +9,16 @@
     <StartupObject>nsfwjs_gui.Program</StartupObject>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <OutputPath></OutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <OutputPath></OutputPath>
+    <PlatformTarget>x64</PlatformTarget>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="RestSharp" Version="106.12.0" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="5.0.0" />

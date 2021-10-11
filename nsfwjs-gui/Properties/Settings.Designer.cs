@@ -23,45 +23,21 @@ namespace nsfwjs_gui.Properties {
             }
         }
         
-        [global::System.Configuration.ApplicationScopedSettingAttribute()]
+        [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("http://localhost:23877/nsfw")]
-        public string LocalUrl {
+        [global::System.Configuration.DefaultSettingValueAttribute("frp.evenstandard.top")]
+        public string Host {
             get {
-                return ((string)(this["LocalUrl"]));
+                return ((string)(this["Host"]));
             }
-        }
-        
-        [global::System.Configuration.ApplicationScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("http://frp.evenstandard.top:23333/single/multipart-form")]
-        public string RemoteUrl {
-            get {
-                return ((string)(this["RemoteUrl"]));
-            }
-        }
-        
-        [global::System.Configuration.ApplicationScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("nsfwjs-rest-server.js")]
-        public string LocalArguments {
-            get {
-                return ((string)(this["LocalArguments"]));
-            }
-        }
-        
-        [global::System.Configuration.ApplicationScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("nsfwjs-rest")]
-        public string LocalWorkingDirectory {
-            get {
-                return ((string)(this["LocalWorkingDirectory"]));
+            set {
+                this["Host"] = value;
             }
         }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("d:\\temp\\nsfwjs-gui\\")]
+        [global::System.Configuration.DefaultSettingValueAttribute("d:\\temp\\nsfwjs_output")]
         public string OutputDirectory {
             get {
                 return ((string)(this["OutputDirectory"]));
@@ -73,13 +49,25 @@ namespace nsfwjs_gui.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("32")]
-        public int OutputLimit {
+        [global::System.Configuration.DefaultSettingValueAttribute("16")]
+        public int SkipLimit {
             get {
-                return ((int)(this["OutputLimit"]));
+                return ((int)(this["SkipLimit"]));
             }
             set {
-                this["OutputLimit"] = value;
+                this["SkipLimit"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("70")]
+        public int MinProbability {
+            get {
+                return ((int)(this["MinProbability"]));
+            }
+            set {
+                this["MinProbability"] = value;
             }
         }
     }
