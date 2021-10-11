@@ -29,13 +29,10 @@ namespace nsfwjs_gui
         /// </summary>
         private void InitializeComponent()
         {
-            this.rbtLocal = new System.Windows.Forms.RadioButton();
-            this.rbtRemote = new System.Windows.Forms.RadioButton();
-            this.chkOutputLimit = new System.Windows.Forms.CheckBox();
             this.label3 = new System.Windows.Forms.Label();
             this.txtOutputDirectory = new System.Windows.Forms.TextBox();
             this.btnOutputDirectory = new System.Windows.Forms.Button();
-            this.nudOutputLimit = new System.Windows.Forms.NumericUpDown();
+            this.nudSkipLimit = new System.Windows.Forms.NumericUpDown();
             this.lvwSource = new System.Windows.Forms.ListView();
             this.btnRemove = new System.Windows.Forms.Button();
             this.btnAdd = new System.Windows.Forms.Button();
@@ -43,48 +40,23 @@ namespace nsfwjs_gui
             this.btnStop = new System.Windows.Forms.Button();
             this.lstLog = new System.Windows.Forms.ListBox();
             this.label4 = new System.Windows.Forms.Label();
-            this.groupBox1 = new System.Windows.Forms.GroupBox();
-            ((System.ComponentModel.ISupportInitialize)(this.nudOutputLimit)).BeginInit();
-            this.groupBox1.SuspendLayout();
+            this.gbxSettings = new System.Windows.Forms.GroupBox();
+            this.label1 = new System.Windows.Forms.Label();
+            this.cboHost = new System.Windows.Forms.ComboBox();
+            this.label2 = new System.Windows.Forms.Label();
+            this.nudProbability = new System.Windows.Forms.NumericUpDown();
+            this.label5 = new System.Windows.Forms.Label();
+            this.label6 = new System.Windows.Forms.Label();
+            this.label7 = new System.Windows.Forms.Label();
+            ((System.ComponentModel.ISupportInitialize)(this.nudSkipLimit)).BeginInit();
+            this.gbxSettings.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.nudProbability)).BeginInit();
             this.SuspendLayout();
-            // 
-            // rbtLocal
-            // 
-            this.rbtLocal.AutoSize = true;
-            this.rbtLocal.Location = new System.Drawing.Point(10, 29);
-            this.rbtLocal.Name = "rbtLocal";
-            this.rbtLocal.Size = new System.Drawing.Size(150, 21);
-            this.rbtLocal.TabIndex = 0;
-            this.rbtLocal.TabStop = true;
-            this.rbtLocal.Text = "Start local rest server";
-            this.rbtLocal.UseVisualStyleBackColor = true;
-            // 
-            // rbtRemote
-            // 
-            this.rbtRemote.AutoSize = true;
-            this.rbtRemote.Location = new System.Drawing.Point(10, 56);
-            this.rbtRemote.Name = "rbtRemote";
-            this.rbtRemote.Size = new System.Drawing.Size(160, 21);
-            this.rbtRemote.TabIndex = 0;
-            this.rbtRemote.TabStop = true;
-            this.rbtRemote.Text = "Use remote rest server";
-            this.rbtRemote.UseVisualStyleBackColor = true;
-            // 
-            // chkOutputLimit
-            // 
-            this.chkOutputLimit.AutoSize = true;
-            this.chkOutputLimit.Location = new System.Drawing.Point(10, 116);
-            this.chkOutputLimit.Name = "chkOutputLimit";
-            this.chkOutputLimit.Size = new System.Drawing.Size(178, 21);
-            this.chkOutputLimit.TabIndex = 4;
-            this.chkOutputLimit.Text = "Max output count limit to ";
-            this.chkOutputLimit.UseVisualStyleBackColor = true;
-            this.chkOutputLimit.CheckedChanged += new System.EventHandler(this.chkOutputLimit_CheckedChanged);
             // 
             // label3
             // 
             this.label3.AutoSize = true;
-            this.label3.Location = new System.Drawing.Point(10, 89);
+            this.label3.Location = new System.Drawing.Point(10, 61);
             this.label3.Name = "label3";
             this.label3.Size = new System.Drawing.Size(105, 17);
             this.label3.TabIndex = 1;
@@ -92,7 +64,7 @@ namespace nsfwjs_gui
             // 
             // txtOutputDirectory
             // 
-            this.txtOutputDirectory.Location = new System.Drawing.Point(121, 86);
+            this.txtOutputDirectory.Location = new System.Drawing.Point(121, 58);
             this.txtOutputDirectory.Name = "txtOutputDirectory";
             this.txtOutputDirectory.Size = new System.Drawing.Size(226, 23);
             this.txtOutputDirectory.TabIndex = 2;
@@ -100,7 +72,7 @@ namespace nsfwjs_gui
             // 
             // btnOutputDirectory
             // 
-            this.btnOutputDirectory.Location = new System.Drawing.Point(353, 86);
+            this.btnOutputDirectory.Location = new System.Drawing.Point(353, 58);
             this.btnOutputDirectory.Name = "btnOutputDirectory";
             this.btnOutputDirectory.Size = new System.Drawing.Size(38, 23);
             this.btnOutputDirectory.TabIndex = 3;
@@ -108,13 +80,18 @@ namespace nsfwjs_gui
             this.btnOutputDirectory.UseVisualStyleBackColor = true;
             this.btnOutputDirectory.Click += new System.EventHandler(this.btnOutputDirectory_Click);
             // 
-            // nudOutputLimit
+            // nudSkipLimit
             // 
-            this.nudOutputLimit.Location = new System.Drawing.Point(194, 115);
-            this.nudOutputLimit.Name = "nudOutputLimit";
-            this.nudOutputLimit.Size = new System.Drawing.Size(65, 23);
-            this.nudOutputLimit.TabIndex = 5;
-            this.nudOutputLimit.Value = new decimal(new int[] {
+            this.nudSkipLimit.Location = new System.Drawing.Point(121, 116);
+            this.nudSkipLimit.Maximum = new decimal(new int[] {
+            10000,
+            0,
+            0,
+            0});
+            this.nudSkipLimit.Name = "nudSkipLimit";
+            this.nudSkipLimit.Size = new System.Drawing.Size(65, 23);
+            this.nudSkipLimit.TabIndex = 5;
+            this.nudSkipLimit.Value = new decimal(new int[] {
             32,
             0,
             0,
@@ -130,6 +107,8 @@ namespace nsfwjs_gui
             this.lvwSource.Size = new System.Drawing.Size(393, 483);
             this.lvwSource.TabIndex = 6;
             this.lvwSource.UseCompatibleStateImageBehavior = false;
+            this.lvwSource.MouseDoubleClick += new System.Windows.Forms.MouseEventHandler(this.lvwSource_MouseDoubleClick);
+            this.lvwSource.MouseUp += new System.Windows.Forms.MouseEventHandler(this.lvwSource_MouseUp);
             // 
             // btnRemove
             // 
@@ -177,6 +156,8 @@ namespace nsfwjs_gui
             this.lstLog.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
+            this.lstLog.BackColor = System.Drawing.Color.Black;
+            this.lstLog.ForeColor = System.Drawing.Color.WhiteSmoke;
             this.lstLog.FormattingEnabled = true;
             this.lstLog.ItemHeight = 17;
             this.lstLog.Location = new System.Drawing.Point(437, 48);
@@ -195,26 +176,99 @@ namespace nsfwjs_gui
             // 
             // groupBox1
             // 
-            this.groupBox1.Controls.Add(this.txtOutputDirectory);
-            this.groupBox1.Controls.Add(this.rbtRemote);
-            this.groupBox1.Controls.Add(this.rbtLocal);
-            this.groupBox1.Controls.Add(this.label3);
-            this.groupBox1.Controls.Add(this.chkOutputLimit);
-            this.groupBox1.Controls.Add(this.btnOutputDirectory);
-            this.groupBox1.Controls.Add(this.nudOutputLimit);
-            this.groupBox1.Location = new System.Drawing.Point(12, 21);
-            this.groupBox1.Name = "groupBox1";
-            this.groupBox1.Size = new System.Drawing.Size(398, 160);
-            this.groupBox1.TabIndex = 12;
-            this.groupBox1.TabStop = false;
-            this.groupBox1.Text = "Settings";
+            this.gbxSettings.Controls.Add(this.cboHost);
+            this.gbxSettings.Controls.Add(this.txtOutputDirectory);
+            this.gbxSettings.Controls.Add(this.label1);
+            this.gbxSettings.Controls.Add(this.label7);
+            this.gbxSettings.Controls.Add(this.label5);
+            this.gbxSettings.Controls.Add(this.label6);
+            this.gbxSettings.Controls.Add(this.label2);
+            this.gbxSettings.Controls.Add(this.label3);
+            this.gbxSettings.Controls.Add(this.btnOutputDirectory);
+            this.gbxSettings.Controls.Add(this.nudProbability);
+            this.gbxSettings.Controls.Add(this.nudSkipLimit);
+            this.gbxSettings.Location = new System.Drawing.Point(12, 21);
+            this.gbxSettings.Name = "groupBox1";
+            this.gbxSettings.Size = new System.Drawing.Size(398, 160);
+            this.gbxSettings.TabIndex = 12;
+            this.gbxSettings.TabStop = false;
+            this.gbxSettings.Text = "Settings";
+            // 
+            // label1
+            // 
+            this.label1.AutoSize = true;
+            this.label1.Location = new System.Drawing.Point(10, 30);
+            this.label1.Name = "label1";
+            this.label1.Size = new System.Drawing.Size(85, 17);
+            this.label1.TabIndex = 1;
+            this.label1.Text = "WebAPI Host";
+            // 
+            // cboHost
+            // 
+            this.cboHost.FormattingEnabled = true;
+            this.cboHost.Items.AddRange(new object[] {
+            "localhost",
+            "frp.evenstandard.top"});
+            this.cboHost.Location = new System.Drawing.Point(121, 27);
+            this.cboHost.Name = "cboHost";
+            this.cboHost.Size = new System.Drawing.Size(270, 25);
+            this.cboHost.TabIndex = 6;
+            this.cboHost.Text = "frp.evenstandard.top";
+            // 
+            // label2
+            // 
+            this.label2.AutoSize = true;
+            this.label2.Location = new System.Drawing.Point(10, 89);
+            this.label2.Name = "label2";
+            this.label2.Size = new System.Drawing.Size(96, 17);
+            this.label2.TabIndex = 1;
+            this.label2.Text = "Min Probability";
+            // 
+            // nudProbability
+            // 
+            this.nudProbability.Location = new System.Drawing.Point(121, 87);
+            this.nudProbability.Name = "nudProbability";
+            this.nudProbability.Size = new System.Drawing.Size(65, 23);
+            this.nudProbability.TabIndex = 5;
+            this.nudProbability.Value = new decimal(new int[] {
+            90,
+            0,
+            0,
+            0});
+            // 
+            // label5
+            // 
+            this.label5.AutoSize = true;
+            this.label5.Location = new System.Drawing.Point(192, 89);
+            this.label5.Name = "label5";
+            this.label5.Size = new System.Drawing.Size(19, 17);
+            this.label5.TabIndex = 1;
+            this.label5.Text = "%";
+            // 
+            // label6
+            // 
+            this.label6.AutoSize = true;
+            this.label6.Location = new System.Drawing.Point(10, 118);
+            this.label6.Name = "label6";
+            this.label6.Size = new System.Drawing.Size(98, 17);
+            this.label6.TabIndex = 1;
+            this.label6.Text = "Skip if matched";
+            // 
+            // label7
+            // 
+            this.label7.AutoSize = true;
+            this.label7.Location = new System.Drawing.Point(192, 118);
+            this.label7.Name = "label7";
+            this.label7.Size = new System.Drawing.Size(39, 17);
+            this.label7.TabIndex = 1;
+            this.label7.Text = "times";
             // 
             // frmMain
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 17F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1350, 729);
-            this.Controls.Add(this.groupBox1);
+            this.Controls.Add(this.gbxSettings);
             this.Controls.Add(this.label4);
             this.Controls.Add(this.lstLog);
             this.Controls.Add(this.btnStop);
@@ -224,23 +278,20 @@ namespace nsfwjs_gui
             this.Controls.Add(this.lvwSource);
             this.Name = "frmMain";
             this.Text = "nsfwjs-gui";
-            ((System.ComponentModel.ISupportInitialize)(this.nudOutputLimit)).EndInit();
-            this.groupBox1.ResumeLayout(false);
-            this.groupBox1.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.nudSkipLimit)).EndInit();
+            this.gbxSettings.ResumeLayout(false);
+            this.gbxSettings.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.nudProbability)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
 
         }
 
         #endregion
-
-        private System.Windows.Forms.RadioButton rbtLocal;
-        private System.Windows.Forms.RadioButton rbtRemote;
-        private System.Windows.Forms.CheckBox chkOutputLimit;
         private System.Windows.Forms.Label label3;
         private System.Windows.Forms.TextBox txtOutputDirectory;
         private System.Windows.Forms.Button btnOutputDirectory;
-        private System.Windows.Forms.NumericUpDown nudOutputLimit;
+        private System.Windows.Forms.NumericUpDown nudSkipLimit;
         private System.Windows.Forms.ListView lvwSource;
         private System.Windows.Forms.Button btnRemove;
         private System.Windows.Forms.Button btnAdd;
@@ -248,6 +299,13 @@ namespace nsfwjs_gui
         private System.Windows.Forms.Button btnStop;
         private System.Windows.Forms.ListBox lstLog;
         private System.Windows.Forms.Label label4;
-        private System.Windows.Forms.GroupBox groupBox1;
+        private System.Windows.Forms.GroupBox gbxSettings;
+        private System.Windows.Forms.ComboBox cboHost;
+        private System.Windows.Forms.Label label1;
+        private System.Windows.Forms.Label label2;
+        private System.Windows.Forms.Label label7;
+        private System.Windows.Forms.Label label5;
+        private System.Windows.Forms.Label label6;
+        private System.Windows.Forms.NumericUpDown nudProbability;
     }
 }
