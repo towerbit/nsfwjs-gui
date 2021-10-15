@@ -75,9 +75,9 @@ namespace nsfwjs_ffmpeg
                 src.StartsWith("rtsp://", StringComparison.OrdinalIgnoreCase))
             {
                 Console.WriteLine($"Decoding {src}...");
-                DecodeAllFramesToImages(deviceType, src, cts.Token, (bmp, num) =>
+                DecodeAllFramesToImages(deviceType, src, cts.Token, (bmp, num, sec) =>
                 {
-                    if (postBitmap(bmp, num, client, output, fProb, ref iCount))
+                    if (postBitmap(bmp, num, client, output, fProb, sec, ref iCount))
                     { 
                         if (iCount >= iSkip)
                         {
@@ -94,19 +94,24 @@ namespace nsfwjs_ffmpeg
 
             Environment.Exit(iCount);
         }
-
-        delegate void dGotBitmap(Bitmap bmp, int frameNum);
+        /// <summary>
+        /// deletegate for got bitmap
+        /// </summary>
+        /// <param name="bmp">bitmap converted from current frame</param>
+        /// <param name="frameId">current frame id</param>
+        /// <param name="timestamp">played seconds</param>
+        delegate void dGotBitmap(Bitmap bmp, int frameId, int timestamp);
         unsafe delegate void dGotYuvData(AVCodecContext pCodexCtx, AVFrame pFrame);
 
-        private static bool postBitmap(Bitmap bmp, int num, RestSharp.IRestClient client, string output, float fProb, ref int iCount)
+        private static bool postBitmap(Bitmap bmp, int num, RestSharp.IRestClient client, string output, float fProb, int sec, ref int iCount)
         {
-            ////直接转JPEG
+            /* convert to JPEG stream */
             //using (var ms = new MemoryStream())
             //{
             //    bmp.Save(ms, ImageFormat.Jpeg);
 
-            ////或者生成JPEG缩略图, 减小文件尺寸和大小
-            using(var ms= JpegCovertHelper.GetStream(bmp, new Size(640,360), JpegCovertHelper.SizeMode.AutoZoom))
+            /* or Convert to JPEG Thumbnail stream, reduce file size for less post */
+            using (var ms= JpegCovertHelper.GetStream(bmp, new Size(640,360), JpegCovertHelper.SizeMode.AutoZoom))
             { 
                 var buff = ms.ToArray();
                 var filename = $"{num:D8}.jpg";
@@ -124,9 +129,19 @@ namespace nsfwjs_ffmpeg
 
                     if (max.probability > fProb && (max.className == "Porn" || max.className == "Hentai"))
                     {
-                        //save matched frame
+                        /* save matched frame */
                         filename = Path.Combine(output, filename);
-                        File.WriteAllBytes(filename, buff);
+                        //File.WriteAllBytes(filename, buff); //save compress stream to file
+                        
+                        /* mark timestamp on bmp */
+                        using (Graphics g = Graphics.FromImage(bmp))
+                        {
+                            TimeSpan ts = new TimeSpan(0, 0, sec);
+                            g.DrawString($"{ts.Hours:D2}:{ts.Minutes:D2}:{ts.Seconds:D2}", new Font("YaHei", 12F, FontStyle.Bold), Brushes.Green, new PointF(10, 10));
+                        }
+                        /* save source bmp to JPEG */
+                        bmp.Save(filename, ImageFormat.Jpeg);
+
                         iCount++;
                         Console.WriteLine($"= WARN = Matched {iCount} for {max.className}, saved to {filename}");
                     }
@@ -225,22 +240,23 @@ namespace nsfwjs_ffmpeg
                 var destinationPixelFormat = AVPixelFormat.AV_PIX_FMT_BGR24;
                 using (var vfc = new VideoFrameConverter(sourceSize, sourcePixelFormat, destinationSize, destinationPixelFormat))
                 {
-                    var frameNumber = 0;
+                    var frameId = 0;
+                    
                     while (!cancellationToken.IsCancellationRequested && vsd.TryDecodeNextFrame(out var frame))
                     {
-                        var convertedFrame = vfc.Convert(frame);
+                        AVFrame convertedFrame = vfc.Convert(frame);
 
                         if (null != fGotBitmap)
                         {
                             if (frame.key_frame == 1)
                                 using (var bitmap = new Bitmap(convertedFrame.width, convertedFrame.height, convertedFrame.linesize[0], PixelFormat.Format24bppRgb, (IntPtr)convertedFrame.data[0]))
                                 {
-                                    //bitmap.Save($"d:\\temp\\frame.{frameNumber:D8}.jpg", ImageFormat.Jpeg);
-                                    fGotBitmap(bitmap, frameNumber);
+                                    var den = frame.pkt_duration * vsd.FrameRate;
+                                    int sec=(int)(frame.best_effort_timestamp / den);
+                                    fGotBitmap(bitmap, frameId, sec);
                                 }
                         }
-                        //Console.WriteLine($"frame: {frameNumber}");
-                        frameNumber++;
+                        frameId++;
                     }
                 }
             }
