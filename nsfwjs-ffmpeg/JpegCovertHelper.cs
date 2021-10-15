@@ -5,7 +5,7 @@ using System.Drawing.Imaging;
 namespace nsfwjs_ffmpeg
 {
     /// <summary>
-    /// Jpeg 压缩辅助类
+    /// Jpeg Compress Helper
     /// </summary>
     public sealed class JpegCovertHelper
     {
@@ -20,7 +20,7 @@ namespace nsfwjs_ffmpeg
             return null;
         }
 
-        //JPEG 压缩参数
+        //JPEG Compress Parameters
         private static EncoderParameters eps = new EncoderParameters(1);
         private static EncoderParameter ep = new EncoderParameter(System.Drawing.Imaging.Encoder.Quality, 35L);
         private static ImageCodecInfo jpsEncodeer = GetEncoder(ImageFormat.Jpeg);
@@ -65,15 +65,15 @@ namespace nsfwjs_ffmpeg
 
             switch (mode)
             {
-                case SizeMode.Both://指定高宽缩放（可能变形）                 
+                case SizeMode.Both://fixed width & heigh, ratio maybe changed                 
                     break;
-                case SizeMode.ByWidth://指定宽，高按比例                     
+                case SizeMode.ByWidth://fixed width，keep ratio
                     toheight = original.Height * width / original.Width;
                     break;
-                case SizeMode.ByHeight://指定高，宽按比例 
+                case SizeMode.ByHeight://fixed height，keep ration
                     towidth = original.Width * height / original.Height;
                     break;
-                case SizeMode.AutoZoom://指定高宽裁减（不变形）                 
+                case SizeMode.AutoZoom://autofit width & height, keep ratio                 
                     if ((double)original.Width / (double)original.Height > (double)towidth / (double)toheight)
                     {
                         oh = original.Height;
@@ -93,22 +93,13 @@ namespace nsfwjs_ffmpeg
                     break;
             }
 
-            //新建一个bmp图片 
             thumbnail = new Bitmap(towidth, toheight);
-
-            //新建一个画板 
             using (var g = Graphics.FromImage(thumbnail))
             {
-                //设置高质量插值法 
                 g.InterpolationMode = InterpolationMode.Low;
-
-                //设置高质量,低速度呈现平滑程度 
                 g.SmoothingMode = SmoothingMode.HighSpeed;
-
-                //清空画布并以透明背景色填充 
                 g.Clear(Color.Transparent);
 
-                //在指定位置并且按指定大小绘制原图片的指定部分 
                 g.DrawImage(original,
                             new Rectangle(0, 0, towidth, toheight),
                             new Rectangle(x, y, ow, oh),

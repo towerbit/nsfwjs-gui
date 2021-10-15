@@ -106,6 +106,7 @@ namespace FFmpeg.AutoGen.Example
             {
                 frame = *_pFrame;
             }
+
             return true;
         }
 

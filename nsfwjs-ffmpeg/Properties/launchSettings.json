@@ -2,7 +2,7 @@
   "profiles": {
     "nsfwjs-ffmpeg": {
       "commandName": "Project",
-      "commandLineArgs": "--src=\"D:\\Downloads\\[电影天堂www.dytt89.com]五个扑水的少年-2001_BD日语中字.mp4\"  --host=frp.evenstandard.top --skip=16  --output=d:\\temp\\nsfwjs-gui\\ --prob=0.7"
+      "commandLineArgs": "--src=\"D:\\Downloads\\JianpianDownload\\人间中毒_BD韩语中字.mp4\"  --host=frp.evenstandard.top --skip=16  --output=d:\\temp\\nsfwjs_output\\ --prob=0.7 --gpu=0"
     }
   }
 }

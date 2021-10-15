@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.IO;
+using Microsoft.VisualBasic;
 
 namespace nsfwjs_gui
 {
@@ -18,6 +19,8 @@ namespace nsfwjs_gui
         public frmMain()
         {
             InitializeComponent();
+
+            this.SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint | ControlStyles.EnableNotifyMessage, true);
             
             gbxSettings.Enabled = true;
             btnStart.Enabled = true;
@@ -32,6 +35,24 @@ namespace nsfwjs_gui
 
             initLvwSource();
             initCmsAdd();
+            initHWDeviceType();
+        }
+
+        protected override CreateParams CreateParams
+        { 
+            get 
+            {
+                //return base.CreateParams; 
+                CreateParams cp = base.CreateParams;
+                cp.ExStyle |= 0x02000000;
+                return cp;
+            }
+        }
+
+        protected override void OnNotifyMessage(Message m)
+        {
+            if(m.Msg!=0x14)
+                base.OnNotifyMessage(m);
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e)
@@ -42,7 +63,9 @@ namespace nsfwjs_gui
             Properties.Settings.Default.OutputDirectory = txtOutputDirectory.Text;
             Properties.Settings.Default.SkipLimit= (int)nudSkipLimit.Value;
             Properties.Settings.Default.MinProbability= (int)nudProbability.Value;
-            Properties.Settings.Default.Save(); 
+            Properties.Settings.Default.Save();
+
+            _cts?.Cancel();
         }
         private ContextMenuStrip _cmsSource;
         private void initLvwSource()
@@ -119,6 +142,15 @@ namespace nsfwjs_gui
             _cmsAdd.Items.AddRange(new[] { mnuFile, mnuUrl });
         }
 
+        private void initHWDeviceType()
+        {
+            var types= Properties.Settings.Default.HWDeviceType.Split(",");
+            cboHWDeviceType.Items.Clear();
+            cboHWDeviceType.Items.Add("NONE");
+            cboHWDeviceType.Items.AddRange(types);
+            cboHWDeviceType.SelectedIndex = 0;
+        }
+
         private CancellationTokenSource _cts;
 
         private void btnStart_Click(object sender, EventArgs e)
@@ -127,19 +159,21 @@ namespace nsfwjs_gui
             foreach (ListViewItem item in lvwSource.Items)
                 item.ForeColor = Color.Black;
                
-            string args = "";
+            StringBuilder  argsb = new StringBuilder();
             if (cboHost.Text=="127.0.0.1" || cboHost.Text.Equals("localhost", StringComparison.OrdinalIgnoreCase))
-                args += $" --host=localhost";
+                argsb.Append($" --host=localhost");
             else
-                args += $" --host={cboHost.Text}";
+                argsb.Append($" --host={cboHost.Text}");
 
             if (nudSkipLimit.Value > 0)
-                args += $" --skip={nudSkipLimit.Value} ";
+                argsb.Append($" --skip={nudSkipLimit.Value} ");
 
             if (txtOutputDirectory.TextLength > 0 && Directory.Exists(txtOutputDirectory.Text))
-                args += $" --output={txtOutputDirectory.Text}";
+                argsb.Append($" --output={txtOutputDirectory.Text}");
 
-            args += $" --prob={nudProbability.Value / 100}";
+            argsb.Append($" --prob={nudProbability.Value / 100}");
+
+            argsb.Append($" --gpu={cboHWDeviceType.SelectedIndex}");
 
             if (txtOutputDirectory.TextLength > 0 && !Directory.Exists(txtOutputDirectory.Text))
                 try
@@ -173,7 +207,7 @@ namespace nsfwjs_gui
                 p.StartInfo.FileName = "nsfwjs-ffmpeg.exe";
                 p.StartInfo.WorkingDirectory = Application.StartupPath;
 #endif
-                p.StartInfo.Arguments = $"--src=\"{item.Text}\" {args}";
+                p.StartInfo.Arguments = $"--src=\"{item.Text}\" {argsb.ToString()}";
                 p.StartInfo.UseShellExecute = false;
                 p.StartInfo.RedirectStandardOutput = true;
                 p.StartInfo.CreateNoWindow = true;

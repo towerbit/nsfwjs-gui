@@ -7,6 +7,7 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 
@@ -23,15 +24,12 @@ namespace nsfwjs_ffmpeg
 
             Console.WriteLine($"FFmpeg version info: {ffmpeg.av_version_info()}");
 
-            SetupLogging();
-            ConfigureHWDecoder(out var deviceType);
-
             var url = "http://frp.evenstandard.top:23877/nsfw";
             var src = ""; // "rtsp://admin:pass@19.0.1.117/H264?ch=1&subtype=0";
             var output = "d:\\temp\\nsfwjs_output";
             var iSkip = 10000;
             var fProb = 0.9F;
-
+            var iGPU = 0;
             foreach (string arg in args)
             {
                 if (arg.StartsWith("--src=", StringComparison.OrdinalIgnoreCase))
@@ -44,7 +42,12 @@ namespace nsfwjs_ffmpeg
                     iSkip = int.Parse(arg.Substring("--skip=".Length));
                 if (arg.StartsWith("--prob=", StringComparison.OrdinalIgnoreCase))
                     fProb = float.Parse(arg.Substring("--prob=".Length));
+                if (arg.StartsWith("--gpu=", StringComparison.OrdinalIgnoreCase))
+                    iGPU = int.Parse(arg.Substring("--gpu=".Length));
             }
+
+            SetupLogging();
+            ConfigureHWDecoder(iGPU, out var deviceType);
 
             if (string.IsNullOrEmpty(src))
             {
@@ -75,16 +78,17 @@ namespace nsfwjs_ffmpeg
                 src.StartsWith("rtsp://", StringComparison.OrdinalIgnoreCase))
             {
                 Console.WriteLine($"Decoding {src}...");
-                DecodeAllFramesToImages(deviceType, src, cts.Token, (bmp, num) =>
-                {
-                    if (postBitmap(bmp, num, client, output, fProb, ref iCount))
-                    { 
-                        if (iCount >= iSkip)
-                        {
-                            cts?.Cancel();
+                DecodeAllFramesToImages(deviceType, src, cts.Token, 
+                    (bmp, num, sec) =>
+                    {
+                        if (postBitmap(bmp, num, client, output, fProb, sec, ref iCount))
+                        { 
+                            if (iCount >= iSkip)
+                            {
+                                cts?.Cancel();
+                            }
                         }
-                    }
-                });
+                    });
             }
             else
             {
@@ -94,19 +98,24 @@ namespace nsfwjs_ffmpeg
 
             Environment.Exit(iCount);
         }
-
-        delegate void dGotBitmap(Bitmap bmp, int frameNum);
+        /// <summary>
+        /// deletegate for got bitmap
+        /// </summary>
+        /// <param name="bmp">bitmap converted from current frame</param>
+        /// <param name="frameId">current frame id</param>
+        /// <param name="timestamp">played seconds</param>
+        delegate void dGotBitmap(Bitmap bmp, int frameId, int timestamp);
         unsafe delegate void dGotYuvData(AVCodecContext pCodexCtx, AVFrame pFrame);
 
-        private static bool postBitmap(Bitmap bmp, int num, RestSharp.IRestClient client, string output, float fProb, ref int iCount)
+        private static bool postBitmap(Bitmap bmp, int num, RestSharp.IRestClient client, string output, float fProb, int sec, ref int iCount)
         {
-            ////直接转JPEG
+            /* convert to JPEG stream */
             //using (var ms = new MemoryStream())
             //{
             //    bmp.Save(ms, ImageFormat.Jpeg);
 
-            ////或者生成JPEG缩略图, 减小文件尺寸和大小
-            using(var ms= JpegCovertHelper.GetStream(bmp, new Size(640,360), JpegCovertHelper.SizeMode.AutoZoom))
+            /* or Convert to JPEG Thumbnail stream, reduce file size for less post */
+            using (var ms= JpegCovertHelper.GetStream(bmp, new Size(640,360), JpegCovertHelper.SizeMode.AutoZoom))
             { 
                 var buff = ms.ToArray();
                 var filename = $"{num:D8}.jpg";
@@ -124,9 +133,19 @@ namespace nsfwjs_ffmpeg
 
                     if (max.probability > fProb && (max.className == "Porn" || max.className == "Hentai"))
                     {
-                        //save matched frame
+                        /* save matched frame */
                         filename = Path.Combine(output, filename);
-                        File.WriteAllBytes(filename, buff);
+                        //File.WriteAllBytes(filename, buff); //save compress stream to file
+                        
+                        /* mark timestamp on bmp */
+                        using (Graphics g = Graphics.FromImage(bmp))
+                        {
+                            TimeSpan ts = new TimeSpan(0, 0, sec);
+                            g.DrawString($"{ts.Hours:D2}:{ts.Minutes:D2}:{ts.Seconds:D2}", new Font("YaHei", 12F, FontStyle.Bold), Brushes.Green, new PointF(10, 10));
+                        }
+                        /* save source bmp to JPEG */
+                        bmp.Save(filename, ImageFormat.Jpeg);
+
                         iCount++;
                         Console.WriteLine($"= WARN = Matched {iCount} for {max.className}, saved to {filename}");
                     }
@@ -150,36 +169,45 @@ namespace nsfwjs_ffmpeg
             return src;
         }
 
-        private static void ConfigureHWDecoder(out AVHWDeviceType HWtype)
+        private static void ConfigureHWDecoder(int inputDecoderNumber, out AVHWDeviceType HWtype)
         {
             HWtype = AVHWDeviceType.AV_HWDEVICE_TYPE_NONE;
             //return;
             //Console.WriteLine("Use hardware acceleration for decoding?[n]");
             //var key = Console.ReadLine();
-            //var availableHWDecoders = new Dictionary<int, AVHWDeviceType>();
+            var availableHWDecoders = new Dictionary<int, AVHWDeviceType>();
             //if (key == "y")
-            //{
-            //    Console.WriteLine("Select hardware decoder:");
-            //    var type = AVHWDeviceType.AV_HWDEVICE_TYPE_NONE;
-            //    var number = 0;
-            //    while ((type = ffmpeg.av_hwdevice_iterate_types(type)) != AVHWDeviceType.AV_HWDEVICE_TYPE_NONE)
-            //    {
-            //        Console.WriteLine($"{++number}. {type}");
-            //        availableHWDecoders.Add(number, type);
-            //    }
-            //    if (availableHWDecoders.Count == 0)
-            //    {
-            //        Console.WriteLine("Your system have no hardware decoders.");
-            //        HWtype = AVHWDeviceType.AV_HWDEVICE_TYPE_NONE;
-            //        return;
-            //    }
-            //    int decoderNumber = availableHWDecoders.SingleOrDefault(t => t.Value == AVHWDeviceType.AV_HWDEVICE_TYPE_DXVA2).Key;
-            //    if (decoderNumber == 0)
-            //        decoderNumber = availableHWDecoders.First().Key;
-            //    Console.WriteLine($"Selected [{decoderNumber}]");
-            //    int.TryParse(Console.ReadLine(), out var inputDecoderNumber);
-            //    availableHWDecoders.TryGetValue(inputDecoderNumber == 0 ? decoderNumber : inputDecoderNumber, out HWtype);
-            //}
+            {
+                //Console.WriteLine("Select hardware decoder:");
+                var type = AVHWDeviceType.AV_HWDEVICE_TYPE_NONE;
+                var number = 0;
+
+                //var sb = new StringBuilder();
+                while ((type = ffmpeg.av_hwdevice_iterate_types(type)) != AVHWDeviceType.AV_HWDEVICE_TYPE_NONE)
+                {
+                    Console.WriteLine($"{++number}. {type}");
+                    availableHWDecoders.Add(number, type);
+                    //sb.AppendLine($"{number}.{type}");
+                }
+                if (availableHWDecoders.Count == 0)
+                {
+                    Console.WriteLine("Your system have no hardware decoders.");
+                    HWtype = AVHWDeviceType.AV_HWDEVICE_TYPE_NONE;
+                    return;
+                }
+
+                int decoderNumber = availableHWDecoders.SingleOrDefault(t => t.Value == AVHWDeviceType.AV_HWDEVICE_TYPE_DXVA2).Key;
+                if (decoderNumber == 0)
+                    decoderNumber = availableHWDecoders.First().Key;
+                //Console.WriteLine($"Selected [{decoderNumber}]");
+                //int.TryParse(Console.ReadLine(), out var inputDecoderNumber);
+
+                //var input = Microsoft.VisualBasic.Interaction.InputBox(sb.ToString(),
+                //    "Use hardware acceleration for decoding?", "0");
+                //int.TryParse(input, out var inputDecoderNumber);
+                //availableHWDecoders.TryGetValue(inputDecoderNumber == 0 ? decoderNumber : inputDecoderNumber, out HWtype);
+                availableHWDecoders.TryGetValue(inputDecoderNumber, out HWtype);
+            }
         }
 
         private static unsafe void SetupLogging()
@@ -215,7 +243,7 @@ namespace nsfwjs_ffmpeg
             using (var vsd = new VideoStreamDecoder(url, HWDevice))
             {
                 Console.WriteLine($"codec name: {vsd.CodecName}");
-
+                Console.WriteLine($"hw device : {HWDevice}");
                 var info = vsd.GetContextInfo();
                 info.ToList().ForEach(x => Console.WriteLine($"{x.Key} = {x.Value}"));
 
@@ -225,22 +253,23 @@ namespace nsfwjs_ffmpeg
                 var destinationPixelFormat = AVPixelFormat.AV_PIX_FMT_BGR24;
                 using (var vfc = new VideoFrameConverter(sourceSize, sourcePixelFormat, destinationSize, destinationPixelFormat))
                 {
-                    var frameNumber = 0;
+                    var frameId = 0;
+                    
                     while (!cancellationToken.IsCancellationRequested && vsd.TryDecodeNextFrame(out var frame))
                     {
-                        var convertedFrame = vfc.Convert(frame);
+                        AVFrame convertedFrame = vfc.Convert(frame);
 
                         if (null != fGotBitmap)
                         {
                             if (frame.key_frame == 1)
                                 using (var bitmap = new Bitmap(convertedFrame.width, convertedFrame.height, convertedFrame.linesize[0], PixelFormat.Format24bppRgb, (IntPtr)convertedFrame.data[0]))
                                 {
-                                    //bitmap.Save($"d:\\temp\\frame.{frameNumber:D8}.jpg", ImageFormat.Jpeg);
-                                    fGotBitmap(bitmap, frameNumber);
+                                    var den = frame.pkt_duration * vsd.FrameRate;
+                                    int sec=(int)(frame.best_effort_timestamp / den);
+                                    fGotBitmap(bitmap, frameId, sec);
                                 }
                         }
-                        //Console.WriteLine($"frame: {frameNumber}");
-                        frameNumber++;
+                        frameId++;
                     }
                 }
             }

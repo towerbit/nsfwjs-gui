@@ -14,5 +14,8 @@
     <Setting Name="MinProbability" Type="System.Int32" Scope="User">
       <Value Profile="(Default)">70</Value>
     </Setting>
+    <Setting Name="HWDeviceType" Type="System.String" Scope="Application">
+      <Value Profile="(Default)">CUDA,DXVA2,QSV,D3D11VA,OPENCL,VULKAN</Value>
+    </Setting>
   </Settings>
 </SettingsFile>
